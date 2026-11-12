@@ -1,13 +1,4 @@
-"""Step 3. Turn text into a vector.
-
-An embedding model reads a sentence and returns a list of numbers. Sentences
-about the same idea land close together, even when they share few words.
-"olive oil fraud" can match a passage about "adulteration of extra virgin olive oil".
-
-This project asks Ollama for all-minilm vectors (384 numbers). The same model
-has to embed the papers and the question. Mixing two models makes the
-distances meaningless.
-"""
+"""Embed text with the Ollama model named in config. Papers and questions must share it."""
 
 from __future__ import annotations
 

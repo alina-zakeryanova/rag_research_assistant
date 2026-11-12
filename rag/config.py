@@ -1,8 +1,4 @@
-"""Every setting for this project lives here.
-
-Change these numbers, rebuild the index, and ask the same question again.
-That is the fastest way to see how a RAG behaves.
-"""
+"""Settings for the local research library."""
 
 from pathlib import Path
 
@@ -31,6 +27,16 @@ CHUNK_OVERLAP = 200
 
 # How many passages are given to the language model for one question.
 TOP_K = 5
+# At most this many passages from the same PDF, so one introduction cannot fill the list.
+MAX_PER_PAPER = 2
+# Blend of vector similarity and shared words. Higher means names like "Raman" matter more.
+LEXICAL_WEIGHT = 0.35
+# Page 1 is usually the title, authors, and a sentence that repeats the abstract.
+PAGE_ONE_PENALTY = 0.15
+
+NUM_CTX = 8192
+WEB_HOST = "127.0.0.1"
+WEB_PORT = 8000
 
 # Ollama runs the language model in a separate process, which is the
 # comfortable setup on a 2020 MacBook Air (this machine has 16GB).

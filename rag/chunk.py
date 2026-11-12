@@ -1,11 +1,4 @@
-"""Step 2. Cut pages into overlapping passages.
-
-The search does not look up a whole paper. It looks up a passage of a few
-hundred words. That passage is a chunk.
-
-Overlap keeps a sentence that sits on a boundary from being sliced in half
-and lost. Chunks stay inside one page so a citation can name that page.
-"""
+"""Cut pages into overlapping passages. A passage stays on one page."""
 
 from __future__ import annotations
 

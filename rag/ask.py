@@ -1,25 +1,14 @@
-"""Ask the index a question and print the RAG trace.
-
-The trace is the lesson. Above every answer you see the passages that were
-retrieved. The model was allowed to use those passages and no others.
-"""
+"""Terminal interface for the library."""
 
 from __future__ import annotations
 
 import argparse
 import textwrap
 
-from rag.answer import generate
+from rag.assistant import Exchange, answer_question
 from rag.config import OLLAMA_MODEL, TOP_K
 from rag.index import indexed_count
-from rag.retrieve import Hit, retrieve
-
-
-EXAMPLES = (
-    "What methods are used to detect olive oil adulteration?",
-    "How is hyperspectral imaging used in these papers?",
-    "Which machine learning models are used for classification?",
-)
+from rag.library import list_papers
 
 
 def _preview(text: str, limit: int = 280) -> str:
@@ -29,15 +18,27 @@ def _preview(text: str, limit: int = 280) -> str:
     return text[:limit].rsplit(" ", 1)[0] + "..."
 
 
-def print_hits(hits: list[Hit]) -> None:
+def print_papers() -> None:
+    papers = list_papers()
+    print(f"{len(papers)} papers")
+    for paper in papers:
+        print(f"  {paper['title']}")
+        print(f"    {paper['source']}   {paper['pages']} pages   {paper['chunks']} passages")
+
+
+def print_exchange(exchange: Exchange) -> None:
+    if exchange.search_query and exchange.search_query not in {exchange.question, exchange.question.removeprefix("Compare ")}:
+        if exchange.kind == "answer" and exchange.search_query != exchange.question:
+            print()
+            print(f"Searched: {exchange.search_query}")
+
     print()
-    print("Retrieved passages")
-    print("These are the only pages the language model will see.")
-    if not hits:
+    print("Sources")
+    if not exchange.hits:
         print("  none")
-        return
-    for number, hit in enumerate(hits, start=1):
-        print(f"  {number}. similarity {hit.score:.2f}   {hit.source}   p. {hit.page}")
+    for number, hit in enumerate(exchange.hits, start=1):
+        score = f"{hit.score:.2f}  " if hit.score else "     "
+        print(f"  {number}. {score}{hit.source}   p. {hit.page}")
         wrapped = textwrap.fill(
             _preview(hit.text),
             width=88,
@@ -46,47 +47,33 @@ def print_hits(hits: list[Hit]) -> None:
         )
         print(wrapped)
 
-
-def ask_once(question: str, top_k: int = TOP_K, show_prompt: bool = False, use_model: bool = True) -> None:
-    print()
-    print("Question")
-    print(textwrap.fill(question, width=88, initial_indent="  ", subsequent_indent="  "))
-
-    hits = retrieve(question, top_k=top_k)
-    print_hits(hits)
-
-    if not use_model:
+    if exchange.note:
         print()
-        print("Stopped before generation (--no-llm). Retrieval is the first half of RAG.")
-        return
-
-    print()
-    print(f"Asking {OLLAMA_MODEL}...")
-    result = generate(question, hits)
-    if show_prompt:
+        print(exchange.note)
+    if exchange.answer:
         print()
-        print("Prompt sent to the model")
-        print(result.prompt)
-    if result.note:
-        print()
-        print(result.note)
-    if result.text:
-        print()
-        print("Answer")
-        for line in result.text.splitlines():
+        print("Answer" if exchange.kind == "answer" else exchange.kind.capitalize())
+        for line in exchange.answer.splitlines():
             print(f"  {line}" if line else "")
-        print()
-        print("Check the passages above before trusting a citation. The model can only know what they contain.")
+    for warning in exchange.warnings:
+        print(f"  ! {warning}")
+
+
+def ask_once(question: str, history: list[dict] | None = None, top_k: int = TOP_K) -> Exchange:
+    exchange = answer_question(question, history=history, top_k=top_k)
+    print_exchange(exchange)
+    return exchange
 
 
 def chat_loop(top_k: int = TOP_K) -> None:
-    count = indexed_count()
-    print(f"Index: {count} passages. Model: {OLLAMA_MODEL}.")
-    print("Example questions:")
-    for example in EXAMPLES:
-        print(f"  {example}")
+    papers = list_papers()
+    print(f"{len(papers)} papers, {indexed_count()} passages, model {OLLAMA_MODEL}.")
+    print("Ask a question, or:")
+    print("  summarize <part of a file name>")
+    print("  compare <topic>")
     print("Type quit to exit.")
 
+    history: list[dict] = []
     while True:
         try:
             question = input("\n> ").strip()
@@ -98,17 +85,20 @@ def chat_loop(top_k: int = TOP_K) -> None:
         if question.lower() in {"quit", "exit", "q"}:
             return
         try:
-            ask_once(question, top_k=top_k)
+            exchange = ask_once(question, history=history, top_k=top_k)
         except Exception as exc:
             print(f"\n{exc}")
+            continue
+        if exchange.answer:
+            history.append({"role": "user", "content": question})
+            history.append({"role": "assistant", "content": exchange.answer})
+            history = history[-8:]
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Ask the research-paper index a question.")
-    parser.add_argument("question", nargs="*", help="Question. Omit it to start a prompt.")
+    parser = argparse.ArgumentParser(description="Ask the research library a question.")
+    parser.add_argument("question", nargs="*", help="Question. Omit it to start a conversation.")
     parser.add_argument("-k", "--top-k", type=int, default=TOP_K, help="Passages to retrieve.")
-    parser.add_argument("--prompt", action="store_true", help="Print the prompt sent to the model.")
-    parser.add_argument("--no-llm", action="store_true", help="Retrieve passages and do not generate.")
     args = parser.parse_args(argv)
 
     if indexed_count() == 0:
@@ -116,7 +106,7 @@ def main(argv: list[str] | None = None) -> None:
 
     question = " ".join(args.question).strip()
     if question:
-        ask_once(question, top_k=args.top_k, show_prompt=args.prompt, use_model=not args.no_llm)
+        ask_once(question, top_k=args.top_k)
         return
     chat_loop(top_k=args.top_k)
 

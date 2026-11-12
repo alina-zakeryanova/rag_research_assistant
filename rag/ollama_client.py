@@ -1,12 +1,4 @@
-"""Talk to Ollama, the local model server already installed on this Mac.
-
-Two models are involved, and they do different jobs:
-
-- all-minilm turns text into vectors (embed.py)
-- qwen3:1.7b writes the answer (answer.py)
-
-This file is the only place that sends HTTP to Ollama.
-"""
+"""HTTP client for the local Ollama server."""
 
 from __future__ import annotations
 
@@ -14,7 +6,7 @@ import json
 import urllib.error
 import urllib.request
 
-from rag.config import OLLAMA_URL
+from rag.config import NUM_CTX, OLLAMA_URL
 
 
 def installed_models() -> list[str] | None:
@@ -80,9 +72,9 @@ def chat(model: str, system: str, user: str) -> str:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            # qwen3 will spend a long time on a hidden reasoning trace unless this is set.
             "think": False,
-            "options": {"temperature": 0.2, "num_ctx": 4096},
+            "keep_alive": "10m",
+            "options": {"temperature": 0.2, "num_ctx": NUM_CTX},
         }
     ).encode()
     request = urllib.request.Request(

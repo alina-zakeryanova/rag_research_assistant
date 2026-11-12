@@ -1,12 +1,4 @@
-"""Step 1. Read each PDF as text, one page at a time.
-
-A PDF is a drawing of a page. RAG needs the characters. This file extracts
-those characters and remembers which page they came from, so later answers
-can cite a file and a page.
-
-Image-only scans have no characters to extract. Those files are reported
-and skipped. OCR is a later project, not this one.
-"""
+"""Read PDF pages into text. Scans with no text layer are skipped."""
 
 from __future__ import annotations
 

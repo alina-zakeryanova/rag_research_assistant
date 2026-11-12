@@ -34,20 +34,7 @@ def build() -> None:
     count = build_index(chunks, reset=True)
     elapsed = time.time() - started
     print(f"Saved {count} chunks in {elapsed:.0f}s.")
-
-    sample = next(
-        (chunk for chunk in chunks if chunk.page > 1 and len(chunk.text) > 400),
-        None,
-    )
-    if sample is not None:
-        preview = sample.text[:320].rsplit(" ", 1)[0]
-        print()
-        print("One chunk, so you can see what the search actually stores:")
-        print(f"  {sample.source}  page {sample.page}")
-        print(f"  {preview}...")
-    print()
-    print("Next: python main.py")
-    print('  or: python main.py "What methods detect olive oil adulteration?"')
+    print("Open the library with: python main.py serve")
 
 
 def main() -> None:

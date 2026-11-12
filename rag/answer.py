@@ -1,29 +1,34 @@
-"""Step 6. Ask a language model to write the answer from the passages.
-
-This is the "G" in RAG. The model does not see your PDFs. It sees only the
-passages retrieve.py returned, pasted into a prompt. If those passages do
-not contain the answer, the model is told to say so.
-
-Ollama serves the model at localhost:11434. Install it once with:
-
-    ollama pull qwen3:1.7b
-"""
+"""Write an answer from retrieved passages, and flag citations that were not retrieved."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from rag.config import OLLAMA_MODEL
 from rag.ollama_client import chat, installed_models, model_ready
 from rag.retrieve import Hit
 
-
-SYSTEM_PROMPT = """You are a research assistant for a personal library of scientific papers.
-Answer only from the passages the user gives you.
-Copy the source line as the citation, in this exact form: [filename.pdf, p. 4].
+SYSTEM_PROMPT = """You are the research assistant for a personal library of scientific papers.
+The only papers you may name are the ones in the Source lines.
+Answer only from those passages.
+After each claim, cite that Source line as [filename.pdf, p. 4].
+Never present a bibliography entry, DOI, or author-year citation from inside a passage as if it were one of the library papers.
 If the passages do not contain the answer, say: I cannot find this in the indexed papers.
-Do not invent measurements, methods, datasets, or citations.
-Write a short answer. Use a list only when the question asks for several items."""
+Do not invent measurements, methods, or datasets.
+Write a short answer. Use a list when the question asks for several items."""
+
+SUMMARY_PROMPT = """You keep reading notes on scientific papers.
+Summarize the paper from the passages. Cover, in order: the question, the method, the data, and the result.
+Cite pages as [filename.pdf, p. 4]. Leave out a section if the passages do not support it.
+Do not invent measurements or datasets."""
+
+COMPARE_PROMPT = """You compare scientific papers for a personal library.
+Write one short paragraph per paper about how it treats the topic.
+Start each paragraph with the file name. Use only the passages.
+If a paper's passages do not address the topic, skip that paper."""
+
+_PDF_NAME = re.compile(r"\S+\.pdf", re.IGNORECASE)
 
 
 @dataclass
@@ -35,9 +40,7 @@ class Answer:
 
 
 def build_prompt(question: str, hits: list[Hit]) -> str:
-    blocks = []
-    for hit in hits:
-        blocks.append(f"Source: {hit.source}, page {hit.page}\n{hit.text}")
+    blocks = [f"Source: {hit.source}, page {hit.page}\n{hit.text}" for hit in hits]
     passages = "\n\n".join(blocks)
     return (
         "Passages from the indexed papers:\n\n"
@@ -47,11 +50,30 @@ def build_prompt(question: str, hits: list[Hit]) -> str:
     )
 
 
-def generate(question: str, hits: list[Hit], model: str = OLLAMA_MODEL) -> Answer:
+def citation_warnings(text: str, hits: list[Hit]) -> list[str]:
+    allowed = {hit.source.lower() for hit in hits}
+    warnings = []
+    seen = set()
+    for raw in _PDF_NAME.findall(text):
+        name = raw.strip(".,;:)]")
+        key = name.lower()
+        if key in seen or key in allowed:
+            continue
+        seen.add(key)
+        warnings.append(f"{name} is cited, and it was not in the retrieved passages.")
+    return warnings
+
+
+def generate(
+    question: str,
+    hits: list[Hit],
+    model: str = OLLAMA_MODEL,
+    system: str = SYSTEM_PROMPT,
+) -> Answer:
     prompt = build_prompt(question, hits)
     if not hits:
         return Answer(
-            text="No passages were retrieved, so there is nothing to answer from.",
+            text="Nothing in the library matched that.",
             prompt=prompt,
             model_used=False,
             note="",
@@ -63,11 +85,7 @@ def generate(question: str, hits: list[Hit], model: str = OLLAMA_MODEL) -> Answe
             text="",
             prompt=prompt,
             model_used=False,
-            note=(
-                "Ollama is not running, so this stop is retrieval only. "
-                "The passages above are what the model would have seen. "
-                "Start the Ollama app, or run `ollama serve` in another terminal."
-            ),
+            note="Ollama is not running. Open the Ollama app, or run `ollama serve` in another terminal.",
         )
     if not model_ready(names, model):
         installed = ", ".join(names) if names else "none"
@@ -76,19 +94,13 @@ def generate(question: str, hits: list[Hit], model: str = OLLAMA_MODEL) -> Answe
             prompt=prompt,
             model_used=False,
             note=(
-                f"Ollama is running, and it does not have `{model}` yet. "
-                f"Installed models: {installed}. "
-                f"Download the one this project expects with: ollama pull {model}"
+                f"Ollama does not have `{model}` yet (installed: {installed}). "
+                f"Download it with: ollama pull {model}"
             ),
         )
 
     try:
-        text = chat(model, SYSTEM_PROMPT, prompt)
+        text = chat(model, system, prompt)
     except RuntimeError as exc:
-        return Answer(
-            text="",
-            prompt=prompt,
-            model_used=False,
-            note=f"{exc} The passages above are still valid.",
-        )
+        return Answer(text="", prompt=prompt, model_used=False, note=str(exc))
     return Answer(text=text, prompt=prompt, model_used=True, note="")
