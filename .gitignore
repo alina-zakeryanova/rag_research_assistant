@@ -7,4 +7,5 @@ data/
 .env
 __pycache__/
 .DS_Store
+research_papers/
 reseach_papers/
