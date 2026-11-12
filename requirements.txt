@@ -1,4 +1,4 @@
-# Read text out of the PDFs in reseach_papers.
+# Read text out of the PDFs in research_papers.
 pypdf>=5.1.0
 
 # Cosine search over the saved vectors. The index itself is a small file in data/index.

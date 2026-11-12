@@ -9,8 +9,8 @@ from pathlib import Path
 # Folder that contains this project (the parent of the rag/ package).
 ROOT = Path(__file__).resolve().parent.parent
 
-# The papers you added. The folder name is spelled "reseach_papers" on disk.
-PAPERS_DIR = ROOT / "reseach_papers"
+# The papers you added.
+PAPERS_DIR = ROOT / "research_papers"
 
 # The index is two files you can inspect:
 #   data/index/chunks.jsonl     the passages, one per line

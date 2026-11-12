@@ -1,6 +1,6 @@
 # Research assistant RAG
 
-A small retrieval-augmented generation project over the papers in `reseach_papers`. It runs locally on this MacBook Air M1 (16GB). No API key.
+A small retrieval-augmented generation project over the papers in `research_papers`. It runs locally on this MacBook Air M1 (16GB). No API key.
 
 The code is the lesson. Each file in `rag/` is one step, and a question prints the passages it retrieved before it prints an answer.
 
@@ -119,6 +119,6 @@ The pieces people add next, still around the same six steps: OCR, a PDF parser t
 ```
 main.py              commands
 rag/                 one file per step
-reseach_papers/      your PDFs (folder name kept as it is on disk)
+research_papers/     your PDFs
 data/index/          chunks.jsonl and embeddings.npy, recreated by ingest
 ```
