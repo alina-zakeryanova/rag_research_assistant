@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from rag.index import load_index
-from rag.retrieve import Hit
+from rag.hits import Hit
 
 _LEADING_NUMBER = re.compile(r"^\d+_")
 

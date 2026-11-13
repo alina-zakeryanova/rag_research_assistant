@@ -10,10 +10,11 @@ from rag.answer import (
     citation_warnings,
     generate,
 )
-from rag.config import OLLAMA_MODEL, TOP_K
+from rag.config import OPENAI_API_KEY, TOP_K, writer_name
+from rag.hits import Hit
 from rag.library import display_name, resolve_source, sample_passages
 from rag.ollama_client import chat, installed_models, model_ready
-from rag.retrieve import Hit, retrieve
+from rag.retrieve import retrieve
 
 _REWRITE = """You rewrite follow-up questions into standalone search queries for a library of scientific papers.
 If the follow-up already stands alone, return it unchanged.
@@ -35,9 +36,10 @@ def standalone_query(question: str, history: list[dict] | None) -> str:
     history = [turn for turn in (history or []) if turn.get("content")]
     if not history:
         return question
-    names = installed_models()
-    if names is None or not model_ready(names, OLLAMA_MODEL):
-        return question
+    if not OPENAI_API_KEY:
+        names = installed_models()
+        if names is None or not model_ready(names, writer_name()):
+            return question
 
     previous = history[-4:]
     lines = []
@@ -47,7 +49,7 @@ def standalone_query(question: str, history: list[dict] | None) -> str:
         lines.append(f"{role}: {text[:500]}")
     lines.append(f"Follow-up: {question}")
     try:
-        rewritten = chat(OLLAMA_MODEL, _REWRITE, "\n".join(lines))
+        rewritten = chat(writer_name(), _REWRITE, "\n".join(lines))
     except RuntimeError:
         return question
     rewritten = rewritten.strip().strip('"').strip("'")

@@ -265,8 +265,14 @@
       if (busy || !message.trim()) return;
       busy = true;
       send.disabled = true;
+      addTurn(message, {
+        answer: "Reading the papers.",
+        sources: [],
+        warnings: [],
+      });
       try {
         const data = await post("/api/chat", { message, history });
+        thread.removeChild(thread.lastElementChild);
         addTurn(message, data);
         if (data.answer) {
           history.push({ role: "user", content: message });
@@ -274,6 +280,7 @@
           if (history.length > 8) history.splice(0, history.length - 8);
         }
       } catch (error) {
+        thread.removeChild(thread.lastElementChild);
         addTurn(message, { answer: "", note: error.message, sources: [], warnings: [] });
       } finally {
         busy = false;
@@ -287,11 +294,19 @@
       button.classList.add("active");
       if (busy) return;
       busy = true;
+      const label = `Summarize ${source}`;
+      addTurn(label, {
+        answer: "Reading this paper.",
+        sources: [],
+        warnings: [],
+      });
       try {
         const data = await post("/api/summarize", { source });
-        addTurn(data.question || `Summarize ${source}`, data);
+        thread.removeChild(thread.lastElementChild);
+        addTurn(data.question || label, data);
       } catch (error) {
-        addTurn(`Summarize ${source}`, { answer: "", note: error.message, sources: [], warnings: [] });
+        thread.removeChild(thread.lastElementChild);
+        addTurn(label, { answer: "", note: error.message, sources: [], warnings: [] });
       } finally {
         busy = false;
       }

@@ -5,9 +5,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from rag.config import OLLAMA_MODEL
+from rag.config import OPENAI_API_KEY, writer_name
 from rag.ollama_client import chat, installed_models, model_ready
-from rag.retrieve import Hit
+from rag.hits import Hit
 
 SYSTEM_PROMPT = """You are the research assistant for a personal library of scientific papers.
 The only papers you may name are the ones in the Source lines.
@@ -55,7 +55,7 @@ def citation_warnings(text: str, hits: list[Hit]) -> list[str]:
     warnings = []
     seen = set()
     for raw in _PDF_NAME.findall(text):
-        name = raw.strip(".,;:)]")
+        name = raw.strip(".,;:)][")
         key = name.lower()
         if key in seen or key in allowed:
             continue
@@ -67,7 +67,7 @@ def citation_warnings(text: str, hits: list[Hit]) -> list[str]:
 def generate(
     question: str,
     hits: list[Hit],
-    model: str = OLLAMA_MODEL,
+    model: str = "",
     system: str = SYSTEM_PROMPT,
 ) -> Answer:
     prompt = build_prompt(question, hits)
@@ -79,28 +79,30 @@ def generate(
             note="",
         )
 
-    names = installed_models()
-    if names is None:
-        return Answer(
-            text="",
-            prompt=prompt,
-            model_used=False,
-            note="Ollama is not running. Open the Ollama app, or run `ollama serve` in another terminal.",
-        )
-    if not model_ready(names, model):
-        installed = ", ".join(names) if names else "none"
-        return Answer(
-            text="",
-            prompt=prompt,
-            model_used=False,
-            note=(
-                f"Ollama does not have `{model}` yet (installed: {installed}). "
-                f"Download it with: ollama pull {model}"
-            ),
-        )
+    if not OPENAI_API_KEY:
+        names = installed_models()
+        if names is None:
+            return Answer(
+                text="",
+                prompt=prompt,
+                model_used=False,
+                note="Ollama is not running. Open the Ollama app, or run `ollama serve` in another terminal.",
+            )
+        if not model_ready(names, model or writer_name()):
+            installed = ", ".join(names) if names else "none"
+            wanted = model or writer_name()
+            return Answer(
+                text="",
+                prompt=prompt,
+                model_used=False,
+                note=(
+                    f"Ollama does not have `{wanted}` yet (installed: {installed}). "
+                    f"Download it with: ollama pull {wanted}"
+                ),
+            )
 
     try:
-        text = chat(model, system, prompt)
+        text = chat(model or writer_name(), system, prompt)
     except RuntimeError as exc:
         return Answer(text="", prompt=prompt, model_used=False, note=str(exc))
     return Answer(text=text, prompt=prompt, model_used=True, note="")

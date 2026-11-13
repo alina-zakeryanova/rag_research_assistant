@@ -1,9 +1,25 @@
 """Settings for the local research library."""
 
+import os
 from pathlib import Path
 
 # Folder that contains this project (the parent of the rag/ package).
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_env() -> None:
+    path = ROOT / ".env"
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_env()
 
 # The papers you added.
 PAPERS_DIR = ROOT / "research_papers"
@@ -35,6 +51,10 @@ LEXICAL_WEIGHT = 0.35
 PAGE_ONE_PENALTY = 0.15
 
 NUM_CTX = 8192
+# Fuse semantic search with BM25, then ask the local model to reorder the shortlist.
+RERANK = True
+RRF_K = 60
+POOL = 12
 WEB_HOST = "127.0.0.1"
 WEB_PORT = 8000
 
@@ -44,5 +64,16 @@ WEB_PORT = 8000
 # After the pipeline makes sense you can try a stronger model:
 #   ollama pull llama3.1:8b
 # and set OLLAMA_MODEL = "llama3.1:8b"
-OLLAMA_MODEL = "qwen3:1.7b"
+OLLAMA_MODEL = "llama3.1:8b"
 OLLAMA_URL = "http://127.0.0.1:11434"
+
+# Writing and reranking go to OpenAI when this is set. Embeddings stay on Ollama.
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+
+
+def writer_name() -> str:
+    if OPENAI_API_KEY:
+        return OPENAI_MODEL
+    return OLLAMA_MODEL

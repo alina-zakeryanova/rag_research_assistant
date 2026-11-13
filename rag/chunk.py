@@ -14,6 +14,14 @@ class Chunk:
     source: str
     page: int
     text: str
+    section: str = ""
+    context: str = ""
+
+    @property
+    def embed_text(self) -> str:
+        if self.context:
+            return f"{self.context}\n{self.text}"
+        return self.text
 
 
 def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:

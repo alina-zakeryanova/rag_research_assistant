@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+import ssl
 import urllib.error
 import urllib.request
 
-from rag.config import NUM_CTX, OLLAMA_URL
+import certifi
+
+from rag.config import NUM_CTX, OLLAMA_URL, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_URL
+
+_SSL = ssl.create_default_context(cafile=certifi.where())
 
 
 def installed_models() -> list[str] | None:
@@ -64,6 +69,8 @@ def embed(texts: list[str], model: str) -> list[list[float]]:
 
 
 def chat(model: str, system: str, user: str) -> str:
+    if OPENAI_API_KEY:
+        return _openai_chat(system, user)
     body = json.dumps(
         {
             "model": model,
@@ -91,3 +98,36 @@ def chat(model: str, system: str, user: str) -> str:
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise RuntimeError(f"Ollama did not return an answer ({exc}).") from exc
     return payload.get("message", {}).get("content", "").strip()
+
+
+def _openai_chat(system: str, user: str) -> str:
+    body = json.dumps(
+        {
+            "model": OPENAI_MODEL,
+            "temperature": 0.2,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+    ).encode()
+    request = urllib.request.Request(
+        OPENAI_URL,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60, context=_SSL) as response:
+            payload = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")
+        raise RuntimeError(f"OpenAI chat failed ({exc.code}): {detail}") from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise RuntimeError(f"OpenAI did not return an answer ({exc}).") from exc
+    choices = payload.get("choices") or []
+    if not choices:
+        raise RuntimeError("OpenAI returned no choices.")
+    return choices[0].get("message", {}).get("content", "").strip()

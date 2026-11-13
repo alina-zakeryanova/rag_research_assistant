@@ -47,11 +47,15 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def _send(self, status: int, body: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            # The page was closed or reloaded before this slow answer could be sent.
+            return
 
     def _json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload).encode()
@@ -113,10 +117,20 @@ class Handler(BaseHTTPRequestHandler):
         self._json(200, _payload(exchange))
 
 
+class LibraryServer(ThreadingHTTPServer):
+    def handle_error(self, request, client_address) -> None:
+        import sys
+
+        value = sys.exc_info()[1]
+        if isinstance(value, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+            return
+        super().handle_error(request, client_address)
+
+
 def serve() -> None:
     if indexed_count() == 0:
         raise SystemExit("No index yet. Run: python main.py ingest")
-    server = ThreadingHTTPServer((WEB_HOST, WEB_PORT), Handler)
+    server = LibraryServer((WEB_HOST, WEB_PORT), Handler)
     print(f"Library  http://{WEB_HOST}:{WEB_PORT}", flush=True)
     print("Ctrl-C to stop.")
     try:

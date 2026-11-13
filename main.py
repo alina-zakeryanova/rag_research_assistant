@@ -4,7 +4,8 @@
     python main.py serve
     python main.py ingest
     python main.py papers
-    python main.py "What methods detect olive oil adulteration?"
+    python main.py bench
+    python main.py mode hyde "Which paper uses Raman spectroscopy?"
 """
 
 from __future__ import annotations
@@ -24,6 +25,36 @@ def main() -> None:
         from rag.ingest import build
 
         build()
+        return
+
+    if command == "bench":
+        from rag.bench import run
+
+        run()
+        return
+
+    if command == "mode":
+        from rag.answer import citation_warnings, generate
+        from rag.ask import print_exchange
+        from rag.assistant import Exchange
+        from rag.pipeline import retrieve_mode
+
+        if len(args) < 3:
+            raise SystemExit(
+                "Usage: python main.py mode <semantic|bm25|rrf|rerank|fusion|decompose|stepback|hyde|crag|adaptive|raptor|route> <question>"
+            )
+        hits, note = retrieve_mode(" ".join(args[2:]), args[1])
+        result = generate(" ".join(args[2:]), hits)
+        print_exchange(
+            Exchange(
+                question=" ".join(args[2:]),
+                search_query=note,
+                answer=result.text,
+                note=result.note,
+                hits=hits,
+                warnings=citation_warnings(result.text, hits),
+            )
+        )
         return
 
     if command == "serve":

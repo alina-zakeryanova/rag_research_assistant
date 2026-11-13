@@ -6,7 +6,7 @@ import argparse
 import textwrap
 
 from rag.assistant import Exchange, answer_question
-from rag.config import OLLAMA_MODEL, TOP_K
+from rag.config import TOP_K, writer_name
 from rag.index import indexed_count
 from rag.library import list_papers
 
@@ -67,7 +67,7 @@ def ask_once(question: str, history: list[dict] | None = None, top_k: int = TOP_
 
 def chat_loop(top_k: int = TOP_K) -> None:
     papers = list_papers()
-    print(f"{len(papers)} papers, {indexed_count()} passages, model {OLLAMA_MODEL}.")
+    print(f"{len(papers)} papers, {indexed_count()} passages, model {writer_name()}.")
     print("Ask a question, or:")
     print("  summarize <part of a file name>")
     print("  compare <topic>")

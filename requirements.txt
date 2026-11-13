@@ -3,3 +3,6 @@ pypdf>=5.1.0
 
 # Cosine search over the saved vectors. The index itself is a small file in data/index.
 numpy>=1.26.0
+
+# Certificate bundle for the OpenAI request. The python.org Mac installer does not ship one.
+certifi>=2024.8.30
